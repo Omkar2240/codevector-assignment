@@ -116,6 +116,12 @@ export default function Home() {
   // Page 1 is fetched with cursor null (cursors[0] = null)
   const [cursors, setCursors] = useState<(Cursor | null)[]>([null]);
 
+  // Seeding states
+  const [seedCount, setSeedCount] = useState<number>(1000);
+  const [seeding, setSeeding] = useState<boolean>(false);
+  const [seedSuccess, setSeedSuccess] = useState<string | null>(null);
+  const [seedError, setSeedError] = useState<string | null>(null);
+
   // Fetch logic wrapped in useCallback
   const loadPage = useCallback(
     async (
@@ -208,6 +214,45 @@ export default function Home() {
     loadPage(1, category, limit, null, null);
   };
 
+  // Handle database seeding
+  const handleSeed = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (seeding || seedCount <= 0) return;
+
+    setSeeding(true);
+    setSeedSuccess(null);
+    setSeedError(null);
+
+    try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_URL || "http://localhost:4000/api";
+      const response = await fetch(`${apiBaseUrl}/seed`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ count: seedCount }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to seed products");
+      }
+
+      if (data.success) {
+        setSeedSuccess(`Successfully seeded ${data.count} products!`);
+        // Refresh products after seeding
+        handleRefresh();
+      } else {
+        throw new Error(data.message || "Failed to seed products");
+      }
+    } catch (err: any) {
+      console.error(err);
+      setSeedError(err.message || "An error occurred while seeding.");
+    } finally {
+      setSeeding(false);
+    }
+  };
+
   return (
     <div className="flex-1 bg-zinc-950 text-zinc-100 font-sans min-h-screen pb-16 selection:bg-indigo-500 selection:text-white">
       {/* Background glowing gradients */}
@@ -256,6 +301,76 @@ export default function Home() {
       {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
         
+        {/* Seeding Control Card */}
+        <section className="mb-8 bg-zinc-900/40 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden backdrop-blur-md">
+          {/* Subtle glowing decoration */}
+          <div className="absolute -top-12 -right-12 w-24 h-24 bg-indigo-500/10 rounded-full filter blur-xl pointer-events-none" />
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-1">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-indigo-400">Database Seeding</h2>
+              <h3 className="text-lg font-bold text-white">Generate Mock Catalog Data</h3>
+              <p className="text-xs text-zinc-500 max-w-md">
+                Dynamically seed products into the database. The seeded products will be distributed across various categories with randomized prices and dates.
+              </p>
+            </div>
+            
+            <form onSubmit={handleSeed} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+              <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-xl focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent transition-all">
+                <label htmlFor="seedCountInput" className="text-xs text-zinc-500 font-medium">Count</label>
+                <input
+                  id="seedCountInput"
+                  type="number"
+                  min={1}
+                  max={200000}
+                  value={seedCount}
+                  onChange={(e) => setSeedCount(Math.max(1, parseInt(e.target.value) || 0))}
+                  disabled={seeding}
+                  className="bg-transparent border-0 text-zinc-100 text-sm font-semibold focus:outline-none focus:ring-0 w-24 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+              </div>
+              
+              <button
+                type="submit"
+                disabled={seeding || seedCount <= 0}
+                className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-sm font-bold text-white transition-all shadow-md shadow-indigo-600/15 disabled:opacity-40 disabled:hover:from-indigo-600 disabled:hover:to-purple-600 disabled:cursor-not-allowed cursor-pointer shrink-0"
+              >
+                {seeding ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    <span>Seeding Database...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Seed Products</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+
+          {/* Feedback Messages */}
+          {seedSuccess && (
+            <div className="mt-4 px-4 py-2.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-emerald-300 text-xs font-medium flex items-center gap-2 animate-fadeIn">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>{seedSuccess}</span>
+            </div>
+          )}
+
+          {seedError && (
+            <div className="mt-4 px-4 py-2.5 rounded-xl border border-red-500/20 bg-red-500/5 text-red-300 text-xs font-medium flex items-center gap-2 animate-fadeIn">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+              <span>{seedError}</span>
+            </div>
+          )}
+        </section>
+
         {/* Categories Bar */}
         <section className="mb-8">
           <div className="flex items-center justify-between mb-4">

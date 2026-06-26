@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import { Pool } from "pg";
 import { randomUUID } from "crypto";
+import { fileURLToPath } from "url";
 
 dotenv.config();
 
@@ -121,7 +122,7 @@ async function initializeDatabase() {
   }
 }
 
-async function seed() {
+async function seed(count = TOTAL_PRODUCTS, closePool = false) {
   try {
     console.time("Seeding");
 
@@ -133,28 +134,39 @@ async function seed() {
 
     console.log("Generating products...");
 
-    const products = generateProducts(TOTAL_PRODUCTS);
+    const products = generateProducts(count);
 
     console.log(`Generated ${products.length} products`);
 
-    for (let i = 0; i < products.length; i += BATCH_SIZE) {
-      const batch = products.slice(i, i + BATCH_SIZE);
+    const batchSize = Math.min(BATCH_SIZE, count);
+
+    for (let i = 0; i < products.length; i += batchSize) {
+      const batch = products.slice(i, i + batchSize);
 
       await insertBatch(batch);
 
       console.log(
-        `Inserted ${i + BATCH_SIZE}/${TOTAL_PRODUCTS}`
+        `Inserted ${i + batch.length}/${count}`
       );
     }
 
     console.timeEnd("Seeding");
 
     console.log("✅ Seeding completed");
+    return { success: true, count };
   } catch (error) {
     console.error(error);
+    throw error;
   } finally {
-    await pool.end();
+    if (closePool) {
+      await pool.end();
+    }
   }
 }
 
-seed();
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  const customCount = parseInt(process.argv[2], 10) || TOTAL_PRODUCTS;
+  seed(customCount, true);
+}
+
+export default seed;
