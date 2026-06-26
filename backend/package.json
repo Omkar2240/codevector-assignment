@@ -7,6 +7,7 @@
     "dev": "nodemon app.js",
     "start": "node app.js",
     "seed": "node scripts/seed.js",
+    "build": "echo \"No build required\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
